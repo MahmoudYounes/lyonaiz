@@ -25,6 +25,11 @@
 - Big distributions like Ubuntu, insert a huge array of modules in the linux kernel because
   they don't know before hand which Hardware will be used to run the linux kernel.
 
+- the only packages required to build the linux kernel through debian are:
+  flex bison libssl-dev libelf-dev
+  given that the build chain is installed ofc.
+  
+
 # Controlling the log level of printk
 - the /proc/sys/kernel/printk shows 4 numbers
 ```bash
@@ -137,6 +142,64 @@ linux kernel provides three implementations of slab:
 - ....: ....
 
 allocated memory is physically contiguous and CPU cache line aligned. same for BSA
+
+# Kernel scheduler
+- the granular unit of scheduling in linux is a thread
+- each thread has a corresponding task struct
+- Linux implements the posix defined set of algorimths plus some more algorithms
+- the posix defined algorithms are:
+  -  CFS (completely fair schedular) SCHED_NORMAL/SCHED_OTHER
+     -  this uses a set of proiority values called niceness between -20 and 19.
+     -  the lower the number the higher the priority.
+     -  sutiable for day to day jobs and servers
+     -  non real time threads can't have a priority of zero in order to make sure that they don't compete with real time threads
+  - Real time SCHED_RR
+    - soft real time scheduling policies
+    - priority ranges from 1 to 99. the lower the number the lesser the prioirty
+    - thread yields the process if it blocks on i/o, stops or dies, or a higher priority task becomes runnable
+    - this works with time slices. i.e a task running will get a certain time slice before the algorithm re-evalutes
+      which task to run
+  - FIFO SCHED_FIFO
+    - soft real time policy as well but more aggressive than RR
+    - priority values the same as RR
+    - conditions for premetion is the same except for the time slice part. there are no time slices in this algorithm.
+      i.e a task running will not yield the proccessor until the conditions happen.
+  - SCHED_BATCH
+    - suitable for non interactive batch jobs
+    - priority same as nice values
+  - SCHED_IDLE
+    - this is a special case used only for task 0.
+    - task 0 is the idle task. if a processor has no tasks to run it runs this task.
+    - this task is called swapper
+- Software and Hardware interrupts are superior to any scheduling algorithm and don't follow scheduling rules.
+- the task_struct belongs to a class of scheduling algorithm. think of this like an abstract class and the algorithms are 
+  implementations of this class.
+- scheduling policies and priorities (nice and priority) are members of task struct
+- Linux implements more algorithms that are superior to FIFO/RR like stop-schedule and deadline
+
+## Shed class
+* linux scheduling class is implemented as a modular OOP class
+* there are 5 main classes (stop-sched, dl, rt, fair, idle)
+* every thread is associated with a task struct
+* in every task struct there is an attribute that describes the type
+* a thread can only belong to one sched class at a time
+* task struct also has pointer to the sched class
+* SCHED_FIFO, RR -> RT
+* SCHED_ORTHER, NORMAL -> CFS
+* swapper, idle -> idle
+* Linux implements a runqueue per processor per scheduling class. 8 cpus => 40 rqs
+* runqueues: Contains the tasks that are ready to run
+* runqueues implementations differ per class, CFS = RBTrees, RT => Array Of linked lists 
+* priority of schedules: SS, DL, RT, CFS, idle
+
+## CFS
+* The scheduler keeps track of the cpu runtime for each thread (sched_entity: contains vruntime: monotonic counter keeps track of amount of time
+  in nanoseconds accumlated as runtime for thread)
+* The thread that has the least runtime will be the next one for scheduling to run
+* runqueue for CFS is an rb-tree with vruntime as key: makes scanning the tree from left to right = timeline for tasks for processor
+
+## Visualizing the flow
+We use perf to visualize the processor core timeline.
 
 # Kernel Api Documentation?
 in this section I will try to document the internal kernel APIs for myself. 
@@ -299,7 +362,10 @@ $ dmesg --decode --nopager --ctime # shows log level and human readable messages
 - have security (spire & stuff) as modules rather than in the init process?
   - not really needed? why would we do that?
 - have canaries run a debug kernel version
+  - the kernel is compiled with enougn debug info. unless you prove there is a need for 
+    more debug options to be enabled this has no meaning
 - validate the production kernel config for security. use the python tool mentioned
+  - security validation happens by security team.
 - validate kernel module settings:
   - do we use customizable modules? No? turn of loading modules..
   - yes? validate modules are forceibly signed before loaded..
