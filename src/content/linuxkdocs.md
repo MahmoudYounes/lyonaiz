@@ -1,7 +1,5 @@
 # The linux kernel docs
-
-- LTTng is a powerful tracing toolkit. youi can search for it lttng.org/docs in order to install. this also has 
-  a nice GUI tool called tracecompass that interprets the output of the trace utilities.
+- LTTng is a powerful tracing toolkit. you can search for it lttng.org/docs in order to install. this also has a nice GUI tool called tracecompass that interprets the output of the trace utilities.
 - there are a bunch of static analyzers for the kernel specifically. the most important and good one is sparse
 - Procmap visualize the complete Kernel Virtual Address Space
 - ctags and cscope kernel browsing tools. need to get familiar with them
@@ -17,13 +15,24 @@
 - linux kernel coding style [style](https://www.kernel.org/doc/html/latest/process/coding-style.html)
 - Kconfig [syntax](https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt)
 - Why initramfs?
-  Imagine for a moment that you are in the business of building and maintaining a new Linux distribution. Now, at installation time, the end user of your distribution might decide to format their SCSI disk with the reiserfs filesystem (FYI, it's the earliest general-purpose journaled filesystem in the kernel). The thing is, you cannot know in advance what choice exactly the end user will make – it could be one of any number of filesystems. So, you decide to pre-build and supply a large variety of kernel modules that will fulfill almost every possibility. Fine, when the installation is complete and the user's system boots up, the kernel will, in this scenario, require the reiserfs.ko kernel module in order to successfully mount the root filesystem and thus proceed with system boot-up.
-  ut wait, think about this, we now have a classic chicken-and-egg problem: in order for the kernel to mount the root filesystem, it requires the reiserfs.ko kernel module file to be loaded into RAM (as it contains the necessary code to be able to work with the filesystem). But, that file is itself embedded inside the reiserfs root filesystem; to be precise, within the /lib/modules/<kernel-ver>/kernel/fs/reiserfs/ directory! One of the primary purposes of the initramfs framework is to solve this chicken-and-egg problem.
-  
-  initramfs contains basic structure of rootfs and has all modules (*.ko) files. cpio file is a flat file format used by tar
+Imagine for a moment that you are in the business of building and maintaining a new Linux distribution. Now, at installation time, the end user of your distribution might decide to format their SCSI disk with the reiserfs filesystem (FYI, 
+it's the earliest general-purpose journaled filesystem in the kernel). The thing is, you cannot know in advance what choice exactly the end user will make – it could be one of any number of filesystems. So, you decide to pre-build and supply 
+a large variety of kernel modules that will fulfill almost every possibility. Fine, when the installation is complete and the user's system boots up, the kernel will, in this scenario, require the reiserfs.ko kernel module in order to 
+successfully mount the root filesystem and thus proceed with system boot-up.
+but wait, think about this, we now have a classic chicken-and-egg problem: in order for the kernel to mount the root filesystem, it requires the reiserfs.ko kernel module file to be loaded into RAM (as it contains the necessary code to be 
+able to work with the filesystem). But, that file is itself embedded inside the reiserfs root filesystem; to be precise, within the /lib/modules/<kernel-ver>/kernel/fs/reiserfs/ directory! One of the primary purposes of the initramfs 
+framework is to solve this chicken-and-egg problem.
+initramfs contains basic structure of rootfs and has all modules (*.ko) files. cpio file is a flat file format used by tar
 
-- Big distributions like Ubuntu, insert a huge array of modules in the linux kernel because
-  they don't know before hand which Hardware will be used to run the linux kernel.
+- Whas is initrd?
+serving the same purpoise ans initramfs, initrd is a cpio archive that is multilevel. i.e, it has to be extracted on multiple times to get the actual file system underneath. the first level contains a Microcode that is the firmware code for 
+the process. the next levels contains
+the actual file system.
+
+- What is the difference between initramfs and initrd?
+initramfs is more modern and more flexible than initrd. supports wider compression algorithms. can be mounted directly as a permenant rootfs and the kernel chooses to pivot later. smaller in size.
+
+- Big distributions like Ubuntu, insert a huge array of modules in the linux kernel because they don't know before hand which Hardware will be used to run the linux kernel.
 
 - the only packages required to build the linux kernel through debian are:
   flex bison libssl-dev libelf-dev
@@ -64,84 +73,41 @@ or through dmesg see --console-level option
      sound (audio) support
      virtualization support
     
-- the kernel module has access to only a subset of all kernel APIs and
-   data structures (more on this in the next chapter!)
+- the kernel module has access to only a subset of all kernel APIs and data structures (more on this in the next chapter!)
 
-- the path /lib/modules/$(uname -r)/build is a symlink to a subset of the linux tree. it contains many of the utilities
-  required by modules to build for example. notice in case of building the linux kernel on Ubuntu you get the build 
-  symlinked to the root of the linux kernel source tree.
+- the path /lib/modules/$(uname -r)/build is a symlink to a subset of the linux tree. it contains many of the utilities required by modules to build for example. notice in case of building the linux kernel from scratch you get the root 
+  folder of the linux kernel symlinked to the root of the linux kernel source tree where the source would originally exist (/usr/lib/modules/...).
 
 - loading and removing modules has a support in the kernel Capabilities model. man page on capabilities(7) for details.
 
-# Memory Layout
-memory in OS is split into layers. biggest layer is called Node. Node is composed of zones, and
-zones is composed of areas.
-check `lstopo` and `lstopo-no-graphics` to visualize this structure and the PCI buses as a bonus.
+# Kernel Directory Structure
+At the very top level of the source tree /usr/src/linux you will see a number of directories:
+- arch
+  The arch subdirectory contains all of the architecture specific kernel code. It has further subdirectories, one per supported architecture, for example i386 and alpha.
+- include
+  The include subdirectory contains most of the include files needed to build the kernel code. It too has further subdirectories including one for every architecture supported. The include/asm subdirectory is a soft link to the real include directory needed for this      
+  architecture, for example include/asm-i386. To change architectures you need to edit the kernel makefile and rerun the Linux kernel configuration program.
+- init
+  This directory contains the initialization code for the kernel and it is a very good place to start looking at how the kernel works.
+- mm
+  This directory contains all of the memory management code. The architecture specific memory management code lives down in arch/*/mm/, for example arch/i386/mm/fault.c.
+- drivers
+  All of the system's device drivers live in this directory. They are further sub-divided into classes of device driver, for example block.
+- ipc
+  This directory contains the kernels inter-process communications code.
+- modules
+  This is simply a directory used to hold built modules.
+- fs
+  All of the file system code. This is further sub-divided into directories, one per supported file system, for example vfat and ext2.
+- kernel
+  The main kernel code. Again, the architecture specific kernel code is in arch/*/kernel.
+- net
+  The kernel's networking code.
+- lib
+  This directory contains the kernel's library code. The architecture specific library code can be found in arch/*/lib/.
+- scripts
+  This directory contains the scripts (for example awk and tk scripts) that are used when the kernel is configured.
 
-
-# BSA (Buddy System Allocation)
-this is the buddy allocation algorithm that is used in kernel. on initialization, it pre-maps the
-whole memory in the RAM that is allocatable. (remember: the lowmemory region in the kernel memory
-space maps all the RAM memory. this is possible since we are talking about the virtual memory of 
-the kernel space, which ideally would be much bigger than the actual memory 
-(4GBs on 32bits & up to 2 ^ 64 / 2 << 60 eta bytes on 64bits "actually 
-it is much less since only 48 bits are used for addressing"). this alogirhtm splits
-the memory into a list of sizes. these sizes are determined by an input called order. this is a 
-kconfig that is passed to kernel on build time (CONFIG_ORDER). the algorithm pre allocates memory
-according to the order as mentioned. order is an integer number. the granular unit of memory the
-kernel uses is a page which is 4k. let's say the order is 11? the kernel allocates 11 different 
-sizes of memory according to this rule:
-2^i * 4 -> is the final size returned. where i belongs to [0-n[
-this means the for n == 11 the kernel splits the memory into the following sizes:
-* 2^0 * 4 = 4k -> when a process requests 4k one of the pages marked here is returned
-* 2^1 * 4 = 8k -> when a process requests 8k one of the pages marked here is returned
-* 2^2 * 4 = 16k -> // // // // 
-* 2^3 * 4 = 32K -> // // // //
-* 2^4 * 4 = 64K -> // // // //
-* 2^5 * 4 = 128K -> // // // //
-* 2^6 * 4 = 256k -> // // / //
-* .
-* .
-* . 
-* 2^10 * 4 = 4096k (4MB) -> the maximum memory that can be allocated on system with order 11.
-
-Notice: the order config is arch dependent. 
-if allocating more than 4MBs, then use the vm apis.
-
-#### Special cases for BSA
-what if we are allocating something like 132KBs that is between 128k and 256k. how will BSA handle
-this?
--> it takes memory chunk of 256k (64 pages of 4kbs) size and returns it.
-What if there was no memory of size 256k available?
--> it takes one 512k memory splits it into two 256k pages. returns one for the caller, and adds
-the other in the available 256k memory pool. this effectively handles external fragmentation issue.
-but notice how bad internal fragmentation is. there is 256k - 132k = 124k memory wasted. this is 
-solved by the get_exact_pages API. it minimizes interna fragmentation but does not eliminate it.
-in this case of free the BSA is smart enough to know that this chunk was split from 512k memory, 
-so it searches for the chunck's buddy (hence Buddy System Allocation) and combines them back in 
-the 512k memory chuncks pool.
-
-#### files to debug this
-- /proc/buddyinfo:
-<node><zone><zone-name><nof2^i*4> for i = 0 to 10 inclusive.
-Node 0, zone      DMA      0      0      0      0      0      0      0      0      1      2      2 
-Node 0, zone    DMA32   4195   4019   3707   2654   1570    770    284     73     17     15     11 
-Node 0, zone   Normal   5714   2150    806    484    324    157     62     20      8      0      0 
-
-
-# Slab
-slab is a linux kernel memory management component that sits on top of Buddy System allocation (BSA).
-upon initialization it requests memory from BSA and caches this memory and then the appropriate
-APIs are used to request this memory. there are specific predefined structs that are cached.
-kernel and/or driver developers can define their own custom structs and register them with slab.
-they can allocate and free such memory and destory the cache when no longer needed. 
-in case of memory pressure, the kernel knows how to shrink the slab cache.
-linux kernel provides three implementations of slab:
-- slab: old classic
-- slub: unqueued slab, optimized
-- ....: ....
-
-allocated memory is physically contiguous and CPU cache line aligned. same for BSA
 
 # Kernel scheduler
 - the granular unit of scheduling in linux is a thread
